@@ -24,7 +24,7 @@ from df_operations import FilterOperation, AggregateOperation, LoadCsvOperation,
 from codegen import generate_notebook_cells
 
 # Настройка страницы
-st.set_page_config(layout="wide", page_title="Простая и элегантная система исследования данных (🚽 SEDES)", page_icon="🚽")
+st.set_page_config(layout="wide", page_title="Система исследования данных", page_icon="🚽")
 
 # Инициализация состояния сессии
 if "app_state" not in st.session_state:
@@ -49,41 +49,75 @@ chart_types = {
 
 
 # Вспомогательные функции
+@st.dialog("Сохранить состояние")
 def save_state():
-    os.makedirs("data", exist_ok=True)
-    st.session_state.app_state.save_state("data/app_state.json")
-    st.success("Состояние успешно сохранено!")
+    st.write("Сохранение текущего состояния")
+    
+    if not st.session_state.app_state.operations:
+        st.warning("Нет операций для сохранения.")
+        return
+    
+    st.write(f"Будет сохранено операций: {len(st.session_state.app_state.operations)}")
+    st.write(f"Компонентов: {len(st.session_state.app_state.components)}")
+    
+    if st.button("Сохранить"):
+        try:
+            os.makedirs("data", exist_ok=True)
+            st.session_state.app_state.save_state("data/app_state.json")
+            st.success("Состояние успешно сохранено!")
+        except Exception as e:
+            st.error(f"Ошибка при сохранении состояния: {e}")
 
 
+@st.dialog("Загрузить состояние")
 def load_state():
-    st.session_state.app_state.load_state("data/app_state.json")
-    st.success("Состояние успешно загружено!")
-    st.rerun()
+    st.write("Загрузка сохранённого состояния")
+    
+    if not os.path.exists("data/app_state.json"):
+        st.warning("Файл состояния не найден. Сначала сохраните состояние.")
+        return
+    
+    # Показываем информацию о файле
+    file_size = os.path.getsize("data/app_state.json")
+    st.write(f"Найден файл: data/app_state.json ({file_size} байт)")
+    
+    if st.button("Загрузить"):
+        try:
+            st.session_state.app_state.load_state("data/app_state.json")
+            st.success("Состояние успешно загружено!")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Ошибка при загрузке состояния: {e}")
 
-
+@st.dialog("Сгенерировать ноутбук")
 def generate_notebook():
     """Генерация Jupyter notebook из текущих операций"""
-    st.subheader("Генерация Jupyter Notebook")
+    st.write("Генерация Jupyter Notebook")
 
     notebook_path = st.text_input("Путь к ноутбуку", value="data_analysis.ipynb")
 
-    if st.button("Сгенерировать ноутбук"):
+    if st.button("Создать ноутбук"):
         try:
             # Создание ячеек ноутбука на основе операций
             cells = generate_notebook_cells()
+
+            if not cells:
+                st.error("Нет операций для генерации ноутбука. Добавьте операции с данными.")
+                return
 
             # Создание ноутбука
             notebook = nbformat.v4.new_notebook()
             notebook.cells = cells
 
             # Сохранение ноутбука
-            with open(notebook_path, "w") as f:
+            os.makedirs(os.path.dirname(notebook_path) if os.path.dirname(notebook_path) else ".", exist_ok=True)
+            with open(notebook_path, "w", encoding="utf-8") as f:
                 nbformat.write(notebook, f)
 
-            st.success(f"Ноутбук сгенерирован по пути {notebook_path}")
+            st.success(f"Ноутбук сохранён: {notebook_path}")
 
-            # Предоставление ссылки для скачивания
-            with open(notebook_path, "r") as f:
+            # Кнопка для скачивания
+            with open(notebook_path, "r", encoding="utf-8") as f:
                 notebook_content = f.read()
 
             st.download_button(
@@ -94,6 +128,8 @@ def generate_notebook():
             )
         except Exception as e:
             st.error(f"Ошибка при генерации ноутбука: {e}")
+            import traceback
+            st.code(traceback.format_exc())
 
 
 # Диалог для добавления или редактирования текстового компонента
@@ -1753,22 +1789,7 @@ def display_state_management_tab():
 
 def main():
     # Основной макет приложения
-    st.title("Простая и элегантная система исследования данных (🚽 SEDES)")
-
-    # Загрузка примера данных, если операций нет
-    if not st.session_state.app_state.operations:
-        # Загрузка примера данных для демонстрации
-        try:
-            sample_df = pd.read_csv("src/iris.csv")
-            if "sample_data_loaded" not in st.session_state:
-                # Создание операции загрузки для примера данных
-                operation = LoadCsvOperation(
-                    name="Пример набора данных Iris", id=uuid4().hex, file_path="src/iris.csv", sep=","
-                )
-                st.session_state.app_state.add_operation(operation)
-                st.session_state.sample_data_loaded = True
-        except Exception as e:
-            st.warning(f"Не удалось загрузить пример данных: {e}")
+    st.title("Cистема исследования данных")
 
     # Боковая панель для операций
     with st.sidebar:
@@ -1825,13 +1846,13 @@ def main():
         c1, c2, c3 = st.columns(3)
 
         with c1:
-            if st.button("💾", help="Сохранить состояние", key="save_state_btn", disabled=True):
+            if st.button("💾", help="Сохранить состояние", key="save_state_btn"):
                 save_state()
         with c2:
-            if st.button("📂", help="Загрузить состояние", key="load_state_btn", disabled=True):
+            if st.button("📂", help="Загрузить состояние", key="load_state_btn"):
                 load_state()
         with c3:
-            if st.button("📓", help="Сгенерировать ноутбук", key="gen_notebook_btn", disabled=True):
+            if st.button("📓", help="Сгенерировать ноутбук", key="gen_notebook_btn"):
                 generate_notebook()
 
     # Основное содержимое
