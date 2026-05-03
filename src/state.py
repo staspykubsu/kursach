@@ -2,11 +2,13 @@ import os
 import json
 import pandas as pd
 import nbformat as nbf
+import plotly.graph_objects as go
+import plotly.io as pio
 from typing import Dict, List, Optional, Any
+from enum import Enum
 from dataclasses import dataclass, field, asdict
-from components import BaseComponent, TextComponent, ChartComponent
+from components import BaseComponent, TextComponent, ChartComponent, DataInfoComponent
 from df_operations import BaseDfOperation, LoadCsvOperation, FilterOperation, AggregateOperation, DataCleanOperation
-
 
 @dataclass
 class AppState:
@@ -160,14 +162,57 @@ class AppState:
     def save_state(self, file_path: str) -> None:
         """Сохранение состояния приложения в JSON файл"""
         state_dict: Dict[str, Any] = {
-            "components": [asdict(comp) for comp in self.components],
+            "components": [self._component_to_dict(comp) for comp in self.components],
             "operations": [op.to_dict() for op in self.operations],
             "current_df_id": self.current_df_id,
             "dataframe_names": self.dataframe_names,
         }
 
         with open(file_path, "w") as f:
-            json.dump(state_dict, f, indent=2)
+            json.dump(state_dict, f, indent=2, default=self._json_serializer)
+
+    def _json_serializer(self, obj):
+        """Пользовательский сериализатор для JSON"""
+        if isinstance(obj, pd.DataFrame):
+            return None  # Пропускаем датафреймы
+        elif isinstance(obj, (go.Figure,)):
+            # Конвертируем фигуру Plotly в JSON-совместимый словарь
+            return pio.to_json(obj)
+        elif isinstance(obj, Enum):
+            return obj.name
+        elif hasattr(obj, '__dict__'):
+            return obj.__dict__
+        elif isinstance(obj, (pd.Series, pd.Index)):
+            return obj.tolist()
+        raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+
+    def _component_to_dict(self, component: BaseComponent) -> Dict[str, Any]:
+        """Преобразование компонента в словарь со всеми дополнительными атрибутами"""
+        base_dict = component.to_dict()
+        
+        # Добавляем все дополнительные атрибуты, которые есть у компонента
+        extra_attrs = {}
+        for attr_name in dir(component):
+            if not attr_name.startswith('_') and attr_name not in base_dict:
+                attr_value = getattr(component, attr_name)
+                # Пропускаем методы
+                if callable(attr_value):
+                    continue
+                
+                try:
+                    # Проверяем, можно ли сериализовать в JSON
+                    if isinstance(attr_value, (go.Figure,)):
+                        extra_attrs[attr_name] = pio.to_json(attr_value)
+                    elif isinstance(attr_value, pd.DataFrame):
+                        continue  # Пропускаем датафреймы
+                    else:
+                        json.dumps(attr_value, default=self._json_serializer)
+                        extra_attrs[attr_name] = attr_value
+                except (TypeError, OverflowError):
+                    continue
+        
+        base_dict.update(extra_attrs)
+        return base_dict
 
     def load_state(self, file_path: str) -> None:
         """Загрузка состояния приложения из JSON файла"""
@@ -186,11 +231,63 @@ class AppState:
 
         # Загрузка компонентов
         for comp_dict in state_dict.get("components", []):
-            if comp_dict.get("component_type") == "text":
-                comp = TextComponent.from_dict(comp_dict)
+            component_type = comp_dict.get("component_type")
+            
+            if component_type == "CHART" or component_type == "chart":
+                # Извлекаем только базовые атрибуты для создания компонента
+                base_keys = {'component_type', 'id', 'name', 'chart'}
+                extra_attrs = {}
+                
+                # Разделяем базовые и дополнительные атрибуты
+                comp_data = {}
+                for key, value in comp_dict.items():
+                    if key in base_keys:
+                        # Обрабатываем chart отдельно
+                        if key == 'chart' and isinstance(value, str):
+                            try:
+                                value = pio.from_json(value)
+                            except:
+                                value = None
+                        comp_data[key] = value
+                    else:
+                        # Сохраняем дополнительные атрибуты
+                        if isinstance(value, str) and (value.startswith('{"data":') or value.startswith('{"layout":')):
+                            try:
+                                value = pio.from_json(value)
+                            except:
+                                pass
+                        extra_attrs[key] = value
+                
+                # Создаем компонент только с базовыми атрибутами
+                comp = ChartComponent.from_dict(comp_data)
+                
+                # Добавляем дополнительные атрибуты
+                for key, value in extra_attrs.items():
+                    setattr(comp, key, value)
+                
                 self.components.append(comp)
-            elif comp_dict.get("component_type") == "chart":
-                comp = ChartComponent.from_dict(comp_dict)
+                
+            elif component_type == "TEXT" or component_type == "text":
+                # Для текстового компонента тоже разделяем атрибуты
+                base_keys = {'component_type', 'id', 'name', 'text'}
+                text_data = {k: v for k, v in comp_dict.items() if k in base_keys}
+                extra_attrs = {k: v for k, v in comp_dict.items() if k not in base_keys}
+                
+                comp = TextComponent.from_dict(text_data)
+                
+                # Добавляем дополнительные атрибуты
+                for key, value in extra_attrs.items():
+                    setattr(comp, key, value)
+                
+                self.components.append(comp)
+                
+            elif component_type == "DATA" or component_type == "data":
+                comp = DataInfoComponent(
+                    source_df_id=comp_dict.get("source_df_id", ""),
+                    info_type=comp_dict.get("info_type", "preview"),
+                    id=comp_dict.get("id"),
+                    name=comp_dict.get("name")
+                )
                 self.components.append(comp)
 
         # Загрузка операций
@@ -207,7 +304,6 @@ class AppState:
             else:
                 continue
 
-            # Добавление операции без выполнения
             self.operations.append(op)
 
         # Установка текущего ID датафрейма
@@ -219,18 +315,22 @@ class AppState:
         # Выполнение операций для восстановления датафреймов
         for op in self.operations:
             if op.operation_type == "load_csv":
-                # Для операций загрузки создаем новый датафрейм
-                df = op.apply(None)
-                self.dataframes[op.id] = df
-                self.original_dataframes[op.id] = df.copy()
+                try:
+                    df = op.apply(None)
+                    self.dataframes[op.id] = df
+                    self.original_dataframes[op.id] = df.copy()
+                except Exception as e:
+                    print(f"Error loading CSV operation {op.id}: {e}")
             else:
-                # Для других операций применяем к соответствующему датафрейму
                 source_df_id = op.source_df_id or self.current_df_id
                 if source_df_id in self.original_dataframes:
                     source_df = self.original_dataframes[source_df_id]
-                    result_df = op.apply(source_df.copy())
-                    self.dataframes[op.id] = result_df
-                    self.original_dataframes[op.id] = source_df.copy()
+                    try:
+                        result_df = op.apply(source_df.copy())
+                        self.dataframes[op.id] = result_df
+                        self.original_dataframes[op.id] = source_df.copy()
+                    except Exception as e:
+                        print(f"Error applying operation {op.id}: {e}")
 
     def generate_notebook(self, file_path: str) -> None:
         """Генерация Jupyter notebook из состояния приложения"""

@@ -46,30 +46,55 @@ class BaseComponent:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "BaseComponent":
         """Создание компонента из словаря."""
-        # Преобразование component_type из строки обратно в enum, если необходимо
         if "component_type" in data and isinstance(data["component_type"], str):
             try:
                 data["component_type"] = ComponentType[data["component_type"]]
             except KeyError:
-                # Обработка случая, когда значение enum не существует
-                data["component_type"] = ComponentType.CHART  # Резервное значение по умолчанию
+                data["component_type"] = ComponentType.CHART
         return cls(**data)
 
 
 @dataclass
 class TextComponent(BaseComponent):
     component_type: ComponentType = ComponentType.TEXT
-    text: Template = ""
+    text: str = ""
 
     def __post_init__(self):
-        super().__post_init__()
-        # Использование первых нескольких символов текста в качестве имени
-        if self.text:
-            text_str = str(self.text)
-            self.name = text_str[:20] + "..." if len(text_str) > 20 else text_str
-
+        # Вызываем родительский __post_init__ для установки id если нужно
+        if self.id is None:
+            self.id = uuid4().hex
+        
+        # Устанавливаем имя только если оно не было передано явно
+        if self.name is None:
+            if self.text:
+                text_str = str(self.text)
+                # Берем первые 50 символов вместо 20 для лучшей читаемости
+                if len(text_str) > 50:
+                    self.name = text_str[:50] + "..."
+                else:
+                    self.name = text_str
+            else:
+                self.name = f"Компонент {self.id[:4]}"
+    
     def draw(self) -> Any:
         return st.write(self.text, key=uuid4().hex)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "TextComponent":
+        """Создание компонента из словаря."""
+        init_data = {
+            'id': data.get('id'),
+            'name': data.get('name'),  # Сохраняем оригинальное имя
+            'text': data.get('text', '')
+        }
+        
+        if "component_type" in data and isinstance(data["component_type"], str):
+            try:
+                init_data["component_type"] = ComponentType[data["component_type"]]
+            except KeyError:
+                init_data["component_type"] = ComponentType.TEXT
+        
+        return cls(**init_data)
 
 
 @dataclass
@@ -77,8 +102,36 @@ class ChartComponent(BaseComponent):
     component_type: ComponentType = ComponentType.CHART
     chart: Chart = None
 
+    def __post_init__(self):
+        # Вызываем родительский __post_init__ для установки id и name
+        super().__post_init__()
+        # Если имя не было установлено родителем и chart существует
+        if self.name and self.name.startswith("Компонент") and self.chart:
+            # Можно установить имя на основе заголовка графика если есть
+            if hasattr(self.chart, 'layout') and hasattr(self.chart.layout, 'title'):
+                title = self.chart.layout.title.text if self.chart.layout.title.text else None
+                if title:
+                    self.name = f"📈 {title}"
+
     def draw(self) -> Any:
         return st.plotly_chart(self.chart, use_container_width=True, key=uuid4().hex)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ChartComponent":
+        """Создание компонента из словаря."""
+        init_data = {
+            'id': data.get('id'),
+            'name': data.get('name'),  # Сохраняем оригинальное имя
+            'chart': data.get('chart')
+        }
+        
+        if "component_type" in data and isinstance(data["component_type"], str):
+            try:
+                init_data["component_type"] = ComponentType[data["component_type"]]
+            except KeyError:
+                init_data["component_type"] = ComponentType.CHART
+        
+        return cls(**init_data)
 
 
 @dataclass
