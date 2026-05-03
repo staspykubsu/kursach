@@ -18,46 +18,118 @@
         </head>
         <body>
             <h1>📊 Отчет анализа данных</h1>
-            <p>Сгенерировано: 2026-05-03 20:52:42</p>
-        <h2>1. Информация о датасете</h2><div class="info-box"><p><strong>Размер:</strong> 2 строк × 2 колонок</p><p><strong>Колонки:</strong> day_type, screen_time_hours</p></div><h3>Базовая статистика числовых колонок</h3><table border="1" class="dataframe table">
+            <p>Сгенерировано: 2026-05-03 21:52:08</p>
+        <h2>1. Информация о датасете</h2><div class="info-box"><p><strong>Размер:</strong> 1800 строк × 11 колонок</p><p><strong>Колонки:</strong> user_id, day_type, work_hours, screen_time_hours, meetings_count, breaks_taken, after_hours_work, sleep_hours, task_completion_rate, burnout_score, burnout_risk</p></div><h3>Базовая статистика числовых колонок</h3><table border="1" class="dataframe table">
   <thead>
     <tr style="text-align: right;">
       <th>Колонка</th>
+      <th>user_id</th>
+      <th>work_hours</th>
       <th>screen_time_hours</th>
+      <th>meetings_count</th>
+      <th>breaks_taken</th>
+      <th>after_hours_work</th>
+      <th>sleep_hours</th>
+      <th>task_completion_rate</th>
+      <th>burnout_score</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <th>count</th>
-      <td>2.000000</td>
+      <td>1800.000000</td>
+      <td>1800.000000</td>
+      <td>1800.000000</td>
+      <td>1800.000000</td>
+      <td>1800.000000</td>
+      <td>1800.000000</td>
+      <td>1800.000000</td>
+      <td>1800.000000</td>
+      <td>1800.000000</td>
     </tr>
     <tr>
       <th>mean</th>
-      <td>13.700000</td>
+      <td>90.500000</td>
+      <td>6.515117</td>
+      <td>9.271406</td>
+      <td>1.941111</td>
+      <td>3.028889</td>
+      <td>0.358889</td>
+      <td>6.996467</td>
+      <td>72.308556</td>
+      <td>44.009978</td>
     </tr>
     <tr>
       <th>std</th>
-      <td>2.828427</td>
+      <td>51.975162</td>
+      <td>2.290521</td>
+      <td>2.409253</td>
+      <td>1.696178</td>
+      <td>1.417844</td>
+      <td>0.479808</td>
+      <td>1.061740</td>
+      <td>14.978647</td>
+      <td>23.881782</td>
     </tr>
     <tr>
       <th>min</th>
-      <td>11.700000</td>
+      <td>1.000000</td>
+      <td>3.000000</td>
+      <td>4.510000</td>
+      <td>0.000000</td>
+      <td>1.000000</td>
+      <td>0.000000</td>
+      <td>4.500000</td>
+      <td>40.000000</td>
+      <td>2.500000</td>
     </tr>
     <tr>
       <th>25%</th>
-      <td>12.700000</td>
+      <td>45.750000</td>
+      <td>4.430000</td>
+      <td>7.240000</td>
+      <td>1.000000</td>
+      <td>2.000000</td>
+      <td>0.000000</td>
+      <td>6.280000</td>
+      <td>62.300000</td>
+      <td>25.370000</td>
     </tr>
     <tr>
       <th>50%</th>
-      <td>13.700000</td>
+      <td>90.500000</td>
+      <td>6.445000</td>
+      <td>9.210000</td>
+      <td>2.000000</td>
+      <td>3.000000</td>
+      <td>0.000000</td>
+      <td>6.990000</td>
+      <td>74.500000</td>
+      <td>39.270000</td>
     </tr>
     <tr>
       <th>75%</th>
-      <td>14.700000</td>
+      <td>135.250000</td>
+      <td>8.510000</td>
+      <td>11.310000</td>
+      <td>3.000000</td>
+      <td>4.000000</td>
+      <td>1.000000</td>
+      <td>7.750000</td>
+      <td>83.700000</td>
+      <td>58.197500</td>
     </tr>
     <tr>
       <th>max</th>
+      <td>180.000000</td>
+      <td>12.170000</td>
       <td>15.700000</td>
+      <td>10.000000</td>
+      <td>5.000000</td>
+      <td>1.000000</td>
+      <td>10.800000</td>
+      <td>107.200000</td>
+      <td>143.920000</td>
     </tr>
   </tbody>
 </table><h3>Пропущенные значения</h3><table border="1" class="dataframe table">
@@ -70,7 +142,17 @@
   </thead>
   <tbody>
     <tr>
+      <td>user_id</td>
+      <td>0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
       <td>day_type</td>
+      <td>0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <td>work_hours</td>
       <td>0</td>
       <td>0.0</td>
     </tr>
@@ -79,8 +161,180 @@
       <td>0</td>
       <td>0.0</td>
     </tr>
+    <tr>
+      <td>meetings_count</td>
+      <td>0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <td>breaks_taken</td>
+      <td>0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <td>after_hours_work</td>
+      <td>0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <td>sleep_hours</td>
+      <td>0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <td>task_completion_rate</td>
+      <td>0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <td>burnout_score</td>
+      <td>0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <td>burnout_risk</td>
+      <td>0</td>
+      <td>0.0</td>
+    </tr>
   </tbody>
-</table><h2>2. Выполненные операции</h2><ol><li><strong>Загрузка CSV 2247</strong> (тип: load_csv)</li><li><strong>Фильтр ce89</strong> (тип: filter)</li><li><strong>Агрегация 1cc3</strong> (тип: aggregate)</li></ol><h2>3. Статистический анализ</h2><h2>4. Визуализации</h2>
+</table><h2>2. Выполненные операции</h2><ol><li><strong>Загрузка CSV 64ac</strong> (тип: load_csv)</li></ol><h2>3. Статистический анализ</h2><h3>3.3. Корреляционный анализ</h3><p><strong>Обнаружены сильные корреляции (|r| > 0.7):</strong></p><ul><li><span class='warning'>work_hours ↔ screen_time_hours: 0.954</span></li><li><span class='warning'>task_completion_rate ↔ burnout_score: -0.960</span></li></ul><h4>Матрица корреляций</h4><table border="1" class="dataframe table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Колонка</th>
+      <th>user_id</th>
+      <th>work_hours</th>
+      <th>screen_time_hours</th>
+      <th>meetings_count</th>
+      <th>breaks_taken</th>
+      <th>after_hours_work</th>
+      <th>sleep_hours</th>
+      <th>task_completion_rate</th>
+      <th>burnout_score</th>
+    </tr>
+    <tr>
+      <th>Колонка</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>user_id</th>
+      <td>1.000</td>
+      <td>0.006</td>
+      <td>0.006</td>
+      <td>0.002</td>
+      <td>0.011</td>
+      <td>-0.040</td>
+      <td>0.019</td>
+      <td>0.065</td>
+      <td>-0.061</td>
+    </tr>
+    <tr>
+      <th>work_hours</th>
+      <td>0.006</td>
+      <td>1.000</td>
+      <td>0.954</td>
+      <td>0.517</td>
+      <td>0.016</td>
+      <td>-0.015</td>
+      <td>0.012</td>
+      <td>-0.124</td>
+      <td>0.119</td>
+    </tr>
+    <tr>
+      <th>screen_time_hours</th>
+      <td>0.006</td>
+      <td>0.954</td>
+      <td>1.000</td>
+      <td>0.490</td>
+      <td>0.003</td>
+      <td>-0.009</td>
+      <td>0.002</td>
+      <td>-0.125</td>
+      <td>0.123</td>
+    </tr>
+    <tr>
+      <th>meetings_count</th>
+      <td>0.002</td>
+      <td>0.517</td>
+      <td>0.490</td>
+      <td>1.000</td>
+      <td>0.024</td>
+      <td>0.008</td>
+      <td>0.023</td>
+      <td>-0.093</td>
+      <td>0.085</td>
+    </tr>
+    <tr>
+      <th>breaks_taken</th>
+      <td>0.011</td>
+      <td>0.016</td>
+      <td>0.003</td>
+      <td>0.024</td>
+      <td>1.000</td>
+      <td>0.039</td>
+      <td>0.012</td>
+      <td>0.003</td>
+      <td>0.004</td>
+    </tr>
+    <tr>
+      <th>after_hours_work</th>
+      <td>-0.040</td>
+      <td>-0.015</td>
+      <td>-0.009</td>
+      <td>0.008</td>
+      <td>0.039</td>
+      <td>1.000</td>
+      <td>-0.000</td>
+      <td>-0.034</td>
+      <td>0.018</td>
+    </tr>
+    <tr>
+      <th>sleep_hours</th>
+      <td>0.019</td>
+      <td>0.012</td>
+      <td>0.002</td>
+      <td>0.023</td>
+      <td>0.012</td>
+      <td>-0.000</td>
+      <td>1.000</td>
+      <td>0.016</td>
+      <td>-0.006</td>
+    </tr>
+    <tr>
+      <th>task_completion_rate</th>
+      <td>0.065</td>
+      <td>-0.124</td>
+      <td>-0.125</td>
+      <td>-0.093</td>
+      <td>0.003</td>
+      <td>-0.034</td>
+      <td>0.016</td>
+      <td>1.000</td>
+      <td>-0.960</td>
+    </tr>
+    <tr>
+      <th>burnout_score</th>
+      <td>-0.061</td>
+      <td>0.119</td>
+      <td>0.123</td>
+      <td>0.085</td>
+      <td>0.004</td>
+      <td>0.018</td>
+      <td>-0.006</td>
+      <td>-0.960</td>
+      <td>1.000</td>
+    </tr>
+  </tbody>
+</table><p>Статистические тесты не выполнялись.</p><h2>4. Визуализации</h2><h3>График 1</h3><div id="chart_0"></div><h3>График 3</h3><div id="chart_2"></div><h3>График 5</h3><div id="chart_4"></div><h3>График 7</h3><div id="chart_6"></div>
         </body>
         </html>
         

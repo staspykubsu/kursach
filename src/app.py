@@ -25,6 +25,7 @@ from codegen import generate_notebook_cells
 from statistics import CorrelationAnalysis, TTestAnalysis, ChiSquaredTest, ANOVAAnalysis
 from preprocessing import DataPreprocessor
 from report_generator import ReportGenerator
+from datetime import datetime
 
 # Настройка страницы
 st.set_page_config(layout="wide", page_title="Система исследования данных", page_icon="🚽")
@@ -1475,7 +1476,7 @@ def display_sample_data(df):
 def display_eda_tab():
     """Отображение компонентов EDA в первой вкладке"""
     # Отображение компонентов
-    st.header("Компоненты EDA")
+    st.header("Компоненты анализа")
     if st.session_state.app_state.components:
         for i, component in enumerate(st.session_state.app_state.components):
             component_id = getattr(component, "id", id(component))
@@ -1786,8 +1787,147 @@ def display_dataframe_info(df):
 
 
 def display_state_management_tab():
-    """Отображение JSON-представления состояния"""
-    pass
+    """Отображение управления состоянием в четвертой вкладке"""
+    st.header("Управление состоянием")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("Сохранить состояние")
+        st.write("Сохраните текущее состояние приложения в файл для последующего использования.")
+        
+        if st.button("💾 Сохранить состояние", use_container_width=True):
+            try:
+                os.makedirs("data", exist_ok=True)
+                st.session_state.app_state.save_state("data/app_state.json")
+                st.success("Состояние успешно сохранено!")
+                
+                # Показываем информацию о сохраненном состоянии
+                if os.path.exists("data/app_state.json"):
+                    file_size = os.path.getsize("data/app_state.json")
+                    st.info(f"Файл: data/app_state.json ({file_size} байт)")
+            except Exception as e:
+                st.error(f"Ошибка при сохранении: {e}")
+    
+    with col2:
+        st.subheader("Загрузить состояние")
+        st.write("Загрузите ранее сохраненное состояние приложения.")
+        
+        if os.path.exists("data/app_state.json"):
+            file_size = os.path.getsize("data/app_state.json")
+            file_time = datetime.fromtimestamp(os.path.getmtime("data/app_state.json"))
+            st.info(f"Найдено сохранение: {file_time.strftime('%Y-%m-%d %H:%M:%S')} ({file_size} байт)")
+        else:
+            st.warning("Сохраненное состояние не найдено")
+        
+        if st.button("📂 Загрузить состояние", use_container_width=True):
+            try:
+                if os.path.exists("data/app_state.json"):
+                    st.session_state.app_state.load_state("data/app_state.json")
+                    st.success("Состояние успешно загружено!")
+                    st.rerun()
+                else:
+                    st.warning("Файл состояния не найден. Сначала сохраните состояние.")
+            except Exception as e:
+                st.error(f"Ошибка при загрузке: {e}")
+    
+    st.divider()
+    
+    # Генерация ноутбука
+    st.subheader("📓 Генерация Jupyter Notebook")
+    st.write("Создайте Jupyter Notebook с кодом для воспроизведения всех выполненных операций.")
+    
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        notebook_path = st.text_input("Путь к ноутбуку", value="data_analysis.ipynb")
+    
+    with col2:
+        if st.button("Сгенерировать", use_container_width=True):
+            try:
+                cells = generate_notebook_cells()
+                
+                if not cells:
+                    st.warning("Нет операций для генерации ноутбука.")
+                else:
+                    notebook = nbformat.v4.new_notebook()
+                    notebook.cells = cells
+                    
+                    os.makedirs(os.path.dirname(notebook_path) if os.path.dirname(notebook_path) else ".", exist_ok=True)
+                    with open(notebook_path, "w", encoding="utf-8") as f:
+                        nbformat.write(notebook, f)
+                    
+                    st.success(f"Ноутбук сохранен: {notebook_path}")
+                    
+                    with open(notebook_path, "r", encoding="utf-8") as f:
+                        notebook_content = f.read()
+                    
+                    st.download_button(
+                        label="📥 Скачать ноутбук",
+                        data=notebook_content,
+                        file_name=os.path.basename(notebook_path),
+                        mime="application/x-ipynb+json",
+                    )
+            except Exception as e:
+                st.error(f"Ошибка: {e}")
+    
+    st.divider()
+    
+    # Информация о состоянии
+    st.subheader("Текущее состояние")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("Операций", len(st.session_state.app_state.operations))
+    with col2:
+        st.metric("Компонентов", len(st.session_state.app_state.components))
+    with col3:
+        st.metric("Датафреймов", len(st.session_state.app_state.dataframes))
+    
+    # Список операций
+    if st.session_state.app_state.operations:
+        with st.expander("Список операций"):
+            for i, op in enumerate(st.session_state.app_state.operations):
+                st.write(f"**{i+1}. {op.name}** ({op.operation_type})")
+                if hasattr(op, 'source_df_id') and op.source_df_id:
+                    source_name = st.session_state.app_state.dataframe_names.get(op.source_df_id, "Неизвестный")
+                    st.write(f"   Исходный датафрейм: {source_name}")
+    
+    # Список датафреймов
+    if st.session_state.app_state.dataframe_names:
+        with st.expander("Доступные датафреймы"):
+            df_info = []
+            for df_id, df_name in st.session_state.app_state.dataframe_names.items():
+                df = st.session_state.app_state.dataframes.get(df_id)
+                if df is not None:
+                    df_info.append({
+                        "Название": df_name,
+                        "Строк": df.shape[0],
+                        "Колонок": df.shape[1],
+                        "Текущий": "✓" if df_id == st.session_state.app_state.current_df_id else ""
+                    })
+            st.dataframe(pd.DataFrame(df_info), use_container_width=True)
+    
+    st.divider()
+    
+    # Сброс состояния
+    st.subheader("Сброс состояния")
+    st.warning("Это действие удалит все операции, компоненты и датафреймы.")
+    
+    if st.button("🗑 Сбросить все состояние", type="primary", use_container_width=True):
+        st.session_state.app_state = AppState()
+        st.session_state.show_df_info = False
+        
+        # Очистка дополнительных результатов
+        for key in ['correlation_result', 'correlation_name', 
+                     'ttest_result', 'ttest_name',
+                     'chi_result', 'chi_name']:
+            if key in st.session_state:
+                del st.session_state[key]
+        
+        st.success("Состояние сброшено!")
+        st.rerun()
 
 @st.dialog("Корреляционный анализ", width="large")
 def add_correlation_analysis():
@@ -1800,7 +1940,11 @@ def add_correlation_analysis():
     name = st.text_input("Название анализа", value=f"Корреляция {uuid4().hex[:4]}")
     
     numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
-    columns = st.multiselect("Колонки для анализа", options=numeric_cols, default=numeric_cols[:5])
+    if len(numeric_cols) < 2:
+        st.warning("Недостаточно числовых колонок для анализа")
+        return
+    
+    columns = st.multiselect("Колонки для анализа", options=numeric_cols, default=numeric_cols[:min(5, len(numeric_cols))])
     
     method = st.selectbox("Метод корреляции", options=["pearson", "spearman", "kendall"])
     
@@ -1818,18 +1962,32 @@ def add_correlation_analysis():
         
         result = analysis.execute(df)
         
-        st.subheader("Результаты корреляционного анализа")
+        # Сохраняем результат в сессию
+        st.session_state.correlation_result = result
+        st.session_state.correlation_name = name
         
-        # Тепловая карта
-        st.plotly_chart(result["figure"], use_container_width=True)
+        # Добавляем компонент с графиком в app_state
+        chart_component = ChartComponent(chart=result["figure"])
+        chart_component.name = f"📈 Корреляция: {name}"
+        setattr(chart_component, "source_df_id", selected_df_id)
+        st.session_state.app_state.add_component(chart_component)
         
-        # Сильные корреляции
+        # Добавляем текстовый компонент с результатами
+        text = f"### 📈 Корреляционный анализ: {name}\n\n"
+        text += f"**Метод:** {method}\n\n"
+        
         if result["high_correlations"]:
-            st.subheader("Сильные корреляции (|r| > 0.7)")
+            text += "**Обнаружены сильные корреляции (|r| > 0.7):**\n\n"
             for corr in result["high_correlations"]:
-                st.write(f"**{corr['var1']}** ↔ **{corr['var2']}**: {corr['correlation']}")
+                text += f"- {corr['var1']} ↔ {corr['var2']}: **{corr['correlation']}**\n"
         else:
-            st.info("Сильных корреляций не обнаружено")
+            text += "*Сильных корреляций не обнаружено.*\n"
+        
+        text_component = TextComponent(text=text)
+        text_component.name = f"📈 Результаты корреляции: {name}"
+        st.session_state.app_state.add_component(text_component)
+        
+        st.rerun()
 
 
 @st.dialog("T-тест")
@@ -1846,8 +2004,19 @@ def add_ttest():
     numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
     cat_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
     
+    if not numeric_cols:
+        st.warning("Нет числовых колонок для анализа")
+        return
+    
+    if not cat_cols:
+        st.warning("Нет категориальных колонок для группировки")
+        return
+    
     column = st.selectbox("Анализируемая колонка", options=numeric_cols)
     group_column = st.selectbox("Группирующая колонка", options=cat_cols)
+    
+    group1 = None
+    group2 = None
     
     if group_column in df.columns:
         unique_values = df[group_column].dropna().unique()
@@ -1856,6 +2025,10 @@ def add_ttest():
             group2 = st.selectbox("Группа 2", options=unique_values, index=min(1, len(unique_values)-1))
     
     if st.button("Выполнить тест"):
+        if group1 is None or group2 is None:
+            st.error("Выберите группы для сравнения")
+            return
+        
         if group1 == group2:
             st.error("Выберите разные группы для сравнения")
             return
@@ -1875,30 +2048,96 @@ def add_ttest():
             st.error(result["error"])
             return
         
-        st.subheader("Результаты T-теста")
+        # Сохраняем результат в сессию
+        st.session_state.ttest_result = result
+        st.session_state.ttest_name = name
         
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("t-статистика", result["t_statistic"])
-            st.metric("p-value", result["p_value"])
-            if result["significant"]:
-                st.success("Различие статистически значимо (p < 0.05)")
-            else:
-                st.warning("Различие не значимо (p ≥ 0.05)")
+        # Добавляем компонент с графиком
+        chart_component = ChartComponent(chart=result["figure"])
+        chart_component.name = f"🔬 T-тест: {name}"
+        setattr(chart_component, "source_df_id", selected_df_id)
+        st.session_state.app_state.add_component(chart_component)
         
-        with col2:
-            st.write("**Группа 1:**")
-            st.write(f"Среднее: {result['group1_stats']['mean']}")
-            st.write(f"Стд. откл.: {result['group1_stats']['std']}")
-            st.write(f"Размер: {result['group1_stats']['size']}")
-            
-            st.write("**Группа 2:**")
-            st.write(f"Среднее: {result['group2_stats']['mean']}")
-            st.write(f"Стд. откл.: {result['group2_stats']['std']}")
-            st.write(f"Размер: {result['group2_stats']['size']}")
+        # Добавляем текстовый компонент с результатами
+        significance = "статистически значимо" if result["significant"] else "не значимо"
+        text = f"### 🔬 T-тест: {name}\n\n"
+        text += f"**Анализируемая колонка:** {column}\n"
+        text += f"**Группирующая колонка:** {group_column}\n\n"
+        text += f"**t-статистика:** {result['t_statistic']}\n"
+        text += f"**p-value:** {result['p_value']}\n"
+        text += f"**Результат:** Различие {significance} (p {'<' if result['significant'] else '>='} 0.05)\n\n"
+        text += f"**Группа 1** ({group1}): среднее = {result['group1_stats']['mean']}, N = {result['group1_stats']['size']}\n"
+        text += f"**Группа 2** ({group2}): среднее = {result['group2_stats']['mean']}, N = {result['group2_stats']['size']}\n"
         
-        st.plotly_chart(result["figure"], use_container_width=True)
+        text_component = TextComponent(text=text)
+        text_component.name = f"🔬 Результаты T-теста: {name}"
+        st.session_state.app_state.add_component(text_component)
+        
+        st.rerun()
 
+
+@st.dialog("Хи-квадрат тест")
+def add_chi_squared():
+    st.write("Хи-квадрат тест для категориальных переменных")
+    
+    selected_df_id, df = select_df(st.session_state.app_state.current_df_id)
+    if df is None:
+        return
+    
+    name = st.text_input("Название анализа", value=f"Хи-квадрат {uuid4().hex[:4]}")
+    
+    cat_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+    
+    if len(cat_cols) < 2:
+        st.warning("Необходимо минимум 2 категориальные колонки")
+        return
+    
+    col1 = st.selectbox("Первая категориальная колонка", options=cat_cols)
+    col2 = st.selectbox("Вторая категориальная колонка", options=[c for c in cat_cols if c != col1])
+    
+    if st.button("Выполнить тест"):
+        if col1 == col2:
+            st.error("Выберите разные колонки")
+            return
+        
+        analysis = ChiSquaredTest(
+            name=name,
+            source_df_id=selected_df_id,
+            column1=col1,
+            column2=col2
+        )
+        
+        result = analysis.execute(df)
+        
+        if "error" in result:
+            st.error(result["error"])
+            return
+        
+        # Сохраняем результат в сессию
+        st.session_state.chi_result = result
+        st.session_state.chi_name = name
+        
+        # Добавляем компонент с графиком
+        chart_component = ChartComponent(chart=result["figure"])
+        chart_component.name = f"🧪 Хи-квадрат: {name}"
+        setattr(chart_component, "source_df_id", selected_df_id)
+        st.session_state.app_state.add_component(chart_component)
+        
+        # Добавляем текстовый компонент с результатами
+        significance = "существует значимая связь" if result["significant"] else "связь не значима"
+        text = f"### 🧪 Хи-квадрат тест: {name}\n\n"
+        text += f"**Переменная 1:** {col1}\n"
+        text += f"**Переменная 2:** {col2}\n\n"
+        text += f"**χ²:** {result['chi2_statistic']}\n"
+        text += f"**p-value:** {result['p_value']}\n"
+        text += f"**Степени свободы:** {result['degrees_of_freedom']}\n"
+        text += f"**Результат:** {significance} (p {'<' if result['significant'] else '>='} 0.05)\n"
+        
+        text_component = TextComponent(text=text)
+        text_component.name = f"🧪 Результаты Хи-квадрат: {name}"
+        st.session_state.app_state.add_component(text_component)
+        
+        st.rerun()
 
 @st.dialog("Предобработка данных")
 def add_preprocessing():
@@ -2082,7 +2321,7 @@ def main():
                 add_ttest()
         with c3:
             if st.button("🧪", help="Хи-квадрат", key="chi_btn"):
-                st.info("В разработке")
+                add_chi_squared()
 
         # Раздел управления состоянием
         st.subheader("Управление состоянием")

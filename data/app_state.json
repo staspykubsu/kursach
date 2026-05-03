@@ -2,39 +2,16 @@
   "components": [],
   "operations": [
     {
-      "name": "\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430 CSV 2247",
-      "id": "924d68081df549be84d79bbee657913c",
+      "name": "\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430 CSV 1fa2",
+      "id": "902f3d72b392497cb64a7242977c0d41",
       "operation_type": "load_csv",
       "source_df_id": null,
       "file_path": "data/work_from_home_burnout_dataset.csv",
       "sep": ","
-    },
-    {
-      "name": "\u0424\u0438\u043b\u044c\u0442\u0440 ce89",
-      "id": "2ce1eb4acbde4231a920021ea0a5dea4",
-      "operation_type": "filter",
-      "source_df_id": "924d68081df549be84d79bbee657913c",
-      "column": "sleep_hours",
-      "filter_type": "greater_than",
-      "filter_value": 8
-    },
-    {
-      "name": "\u0410\u0433\u0440\u0435\u0433\u0430\u0446\u0438\u044f 1cc3",
-      "id": "beb95f48557c4d79a79ca37a0a369693",
-      "operation_type": "aggregate",
-      "source_df_id": "924d68081df549be84d79bbee657913c",
-      "group_by": [
-        "day_type"
-      ],
-      "agg_func": {
-        "screen_time_hours": "max"
-      }
     }
   ],
-  "current_df_id": "beb95f48557c4d79a79ca37a0a369693",
+  "current_df_id": "902f3d72b392497cb64a7242977c0d41",
   "dataframe_names": {
-    "924d68081df549be84d79bbee657913c": "\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430 CSV 2247",
-    "2ce1eb4acbde4231a920021ea0a5dea4": "\u0424\u0438\u043b\u044c\u0442\u0440 ce89",
-    "beb95f48557c4d79a79ca37a0a369693": "\u0410\u0433\u0440\u0435\u0433\u0430\u0446\u0438\u044f 1cc3"
+    "902f3d72b392497cb64a7242977c0d41": "\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430 CSV 1fa2"
   }
 }
