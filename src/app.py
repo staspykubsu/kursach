@@ -22,6 +22,9 @@ from charts import (
 from dfinfo import DataFrameInfo
 from df_operations import FilterOperation, AggregateOperation, LoadCsvOperation, SaveCsvOperation, DataCleanOperation
 from codegen import generate_notebook_cells
+from statistics import CorrelationAnalysis, TTestAnalysis, ChiSquaredTest, ANOVAAnalysis
+from preprocessing import DataPreprocessor
+from report_generator import ReportGenerator
 
 # Настройка страницы
 st.set_page_config(layout="wide", page_title="Система исследования данных", page_icon="🚽")
@@ -1786,6 +1789,227 @@ def display_state_management_tab():
     """Отображение JSON-представления состояния"""
     pass
 
+@st.dialog("Корреляционный анализ", width="large")
+def add_correlation_analysis():
+    st.write("Корреляционный анализ")
+    
+    selected_df_id, df = select_df(st.session_state.app_state.current_df_id)
+    if df is None:
+        return
+    
+    name = st.text_input("Название анализа", value=f"Корреляция {uuid4().hex[:4]}")
+    
+    numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+    columns = st.multiselect("Колонки для анализа", options=numeric_cols, default=numeric_cols[:5])
+    
+    method = st.selectbox("Метод корреляции", options=["pearson", "spearman", "kendall"])
+    
+    if st.button("Выполнить анализ"):
+        if len(columns) < 2:
+            st.error("Выберите минимум 2 колонки")
+            return
+        
+        analysis = CorrelationAnalysis(
+            name=name,
+            source_df_id=selected_df_id,
+            columns=columns,
+            method=method
+        )
+        
+        result = analysis.execute(df)
+        
+        st.subheader("Результаты корреляционного анализа")
+        
+        # Тепловая карта
+        st.plotly_chart(result["figure"], use_container_width=True)
+        
+        # Сильные корреляции
+        if result["high_correlations"]:
+            st.subheader("Сильные корреляции (|r| > 0.7)")
+            for corr in result["high_correlations"]:
+                st.write(f"**{corr['var1']}** ↔ **{corr['var2']}**: {corr['correlation']}")
+        else:
+            st.info("Сильных корреляций не обнаружено")
+
+
+@st.dialog("T-тест")
+def add_ttest():
+    st.write("T-тест для сравнения двух групп")
+    
+    selected_df_id, df = select_df(st.session_state.app_state.current_df_id)
+    if df is None:
+        return
+    
+    name = st.text_input("Название анализа", value=f"T-тест {uuid4().hex[:4]}")
+    
+    columns = df.columns.tolist()
+    numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+    cat_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+    
+    column = st.selectbox("Анализируемая колонка", options=numeric_cols)
+    group_column = st.selectbox("Группирующая колонка", options=cat_cols)
+    
+    if group_column in df.columns:
+        unique_values = df[group_column].dropna().unique()
+        if len(unique_values) >= 2:
+            group1 = st.selectbox("Группа 1", options=unique_values, index=0)
+            group2 = st.selectbox("Группа 2", options=unique_values, index=min(1, len(unique_values)-1))
+    
+    if st.button("Выполнить тест"):
+        if group1 == group2:
+            st.error("Выберите разные группы для сравнения")
+            return
+        
+        analysis = TTestAnalysis(
+            name=name,
+            source_df_id=selected_df_id,
+            column=column,
+            group_column=group_column,
+            group1=group1,
+            group2=group2
+        )
+        
+        result = analysis.execute(df)
+        
+        if "error" in result:
+            st.error(result["error"])
+            return
+        
+        st.subheader("Результаты T-теста")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("t-статистика", result["t_statistic"])
+            st.metric("p-value", result["p_value"])
+            if result["significant"]:
+                st.success("Различие статистически значимо (p < 0.05)")
+            else:
+                st.warning("Различие не значимо (p ≥ 0.05)")
+        
+        with col2:
+            st.write("**Группа 1:**")
+            st.write(f"Среднее: {result['group1_stats']['mean']}")
+            st.write(f"Стд. откл.: {result['group1_stats']['std']}")
+            st.write(f"Размер: {result['group1_stats']['size']}")
+            
+            st.write("**Группа 2:**")
+            st.write(f"Среднее: {result['group2_stats']['mean']}")
+            st.write(f"Стд. откл.: {result['group2_stats']['std']}")
+            st.write(f"Размер: {result['group2_stats']['size']}")
+        
+        st.plotly_chart(result["figure"], use_container_width=True)
+
+
+@st.dialog("Предобработка данных")
+def add_preprocessing():
+    st.write("Предобработка данных")
+    
+    selected_df_id, df = select_df(st.session_state.app_state.current_df_id)
+    if df is None:
+        return
+    
+    name = st.text_input("Название операции", value=f"Предобработка {uuid4().hex[:4]}")
+    
+    preprocessing_type = st.selectbox("Тип предобработки", options=[
+        "normalize",
+        "standardize", 
+        "label_encode",
+        "one_hot_encode",
+        "remove_outliers",
+        "binning"
+    ], format_func=lambda x: {
+        "normalize": "Нормализация (Min-Max)",
+        "standardize": "Стандартизация (Z-score)",
+        "label_encode": "Label Encoding",
+        "one_hot_encode": "One-Hot Encoding",
+        "remove_outliers": "Удаление выбросов",
+        "binning": "Биннинг"
+    }.get(x, x))
+    
+    columns = []
+    if preprocessing_type in ["normalize", "standardize", "binning"]:
+        numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+        columns = st.multiselect("Колонки", options=numeric_cols)
+    elif preprocessing_type in ["label_encode", "one_hot_encode"]:
+        cat_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+        columns = st.multiselect("Колонки", options=cat_cols)
+    elif preprocessing_type == "remove_outliers":
+        numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+        columns = st.multiselect("Колонки", options=numeric_cols)
+    
+    params = {}
+    if preprocessing_type == "remove_outliers":
+        params["method"] = st.selectbox("Метод", options=["iqr", "zscore"])
+        if params["method"] == "iqr":
+            params["threshold"] = st.slider("Порог IQR", 1.0, 3.0, 1.5, 0.1)
+        else:
+            params["z_threshold"] = st.slider("Z-score порог", 2.0, 5.0, 3.0, 0.5)
+    elif preprocessing_type == "binning":
+        params["n_bins"] = st.slider("Количество бинов", 2, 20, 5)
+    
+    if st.button("Применить"):
+        if not columns and preprocessing_type not in ["remove_outliers"]:
+            st.warning("Будут обработаны все подходящие колонки")
+        
+        preprocessor = DataPreprocessor(
+            name=name,
+            preprocessing_type=preprocessing_type,
+            columns=columns,
+            params=params
+        )
+        
+        result_df = preprocessor.apply(df)
+        
+        # Сохраняем результат как новую операцию
+        from df_operations import DataCleanOperation
+        operation = DataCleanOperation(
+            name=name,
+            id=uuid4().hex,
+            clean_type="preprocessing",
+            source_df_id=selected_df_id
+        )
+        
+        st.session_state.app_state.operations.append(operation)
+        st.session_state.app_state.dataframes[operation.id] = result_df
+        st.session_state.app_state.dataframe_names[operation.id] = name
+        st.session_state.app_state.current_df_id = operation.id
+        
+        st.success(f"Предобработка применена! Новый датафрейм: {result_df.shape}")
+        st.dataframe(result_df.head())
+        
+        st.rerun()
+
+
+@st.dialog("Сгенерировать отчет")
+def generate_report():
+    st.write("Генерация HTML отчета")
+    
+    if not st.session_state.app_state.operations:
+        st.warning("Нет данных для отчета. Выполните операции с данными.")
+        return
+    
+    report_path = st.text_input("Путь к отчету", value="data_analysis_report.html")
+    
+    if st.button("Сгенерировать отчет"):
+        generator = ReportGenerator(st.session_state.app_state)
+        html_content = generator.generate_html_report()
+        
+        os.makedirs(os.path.dirname(report_path) if os.path.dirname(report_path) else ".", exist_ok=True)
+        with open(report_path, "w", encoding="utf-8") as f:
+            f.write(html_content)
+        
+        st.success(f"Отчет сохранен: {report_path}")
+        
+        with open(report_path, "r", encoding="utf-8") as f:
+            report_content = f.read()
+        
+        st.download_button(
+            label="Скачать отчет",
+            data=report_content,
+            file_name=os.path.basename(report_path),
+            mime="text/html"
+        )
+
 
 def main():
     # Основной макет приложения
@@ -1813,7 +2037,7 @@ def main():
         # Раздел преобразований данных
         st.subheader("Преобразования данных")
 
-        c1, c2, c3 = st.columns(3)
+        c1, c2, c3, c4 = st.columns(4)
 
         with c1:
             if st.button("🔍", help="Добавить фильтр", key="add_filter_btn"):
@@ -1824,7 +2048,11 @@ def main():
         with c3:
             if st.button("🧹", help="Добавить очистку данных", key="add_clean_btn"):
                 add_data_cleaning()
-
+                
+        with c4:
+            if st.button("⚙️", help="Предобработка данных", key="preprocess_btn"):
+                add_preprocessing()
+                
         # Раздел компонентов EDA
         st.subheader("Компоненты EDA")
 
@@ -1840,10 +2068,26 @@ def main():
             if st.button("📊", help="Добавить информацию о данных", key="add_data_info_btn"):
                 add_data_info()
 
+
+                # Раздел статистического анализа
+        st.subheader("Статистический анализ")
+        
+        c1, c2, c3 = st.columns(3)
+        
+        with c1:
+            if st.button("📈", help="Корреляционный анализ", key="corr_btn"):
+                add_correlation_analysis()
+        with c2:
+            if st.button("🔬", help="T-тест", key="ttest_btn"):
+                add_ttest()
+        with c3:
+            if st.button("🧪", help="Хи-квадрат", key="chi_btn"):
+                st.info("В разработке")
+
         # Раздел управления состоянием
         st.subheader("Управление состоянием")
 
-        c1, c2, c3 = st.columns(3)
+        c1, c2, c3, c4 = st.columns(4)
 
         with c1:
             if st.button("💾", help="Сохранить состояние", key="save_state_btn"):
@@ -1855,6 +2099,10 @@ def main():
             if st.button("📓", help="Сгенерировать ноутбук", key="gen_notebook_btn"):
                 generate_notebook()
 
+        with c4:
+            if st.button("📄", help="Сгенерировать отчет", key="report_btn"):
+                generate_report()
+        
     # Основное содержимое
     tab1, tab2, tab3, tab4 = st.tabs(["EDA", "Операции с данными", "Предпросмотр данных", "Управление состоянием"])
 
