@@ -2229,25 +2229,37 @@ def generate_report():
     
     report_path = st.text_input("Путь к отчету", value="data_analysis_report.html")
     
+    # Убрали выбор формата, оставили только HTML
+    
     if st.button("Сгенерировать отчет"):
-        generator = ReportGenerator(st.session_state.app_state)
-        html_content = generator.generate_html_report()
-        
-        os.makedirs(os.path.dirname(report_path) if os.path.dirname(report_path) else ".", exist_ok=True)
-        with open(report_path, "w", encoding="utf-8") as f:
-            f.write(html_content)
-        
-        st.success(f"Отчет сохранен: {report_path}")
-        
-        with open(report_path, "r", encoding="utf-8") as f:
-            report_content = f.read()
-        
-        st.download_button(
-            label="Скачать отчет",
-            data=report_content,
-            file_name=os.path.basename(report_path),
-            mime="text/html"
-        )
+        try:
+            with st.spinner("Генерация отчета..."):
+                generator = ReportGenerator(st.session_state.app_state)
+                html_content = generator.generate_html_report()
+                
+                # Сохраняем HTML
+                os.makedirs(os.path.dirname(report_path) if os.path.dirname(report_path) else ".", exist_ok=True)
+                with open(report_path, "w", encoding="utf-8") as f:
+                    f.write(html_content)
+                
+                st.success(f"HTML отчет сохранен: {report_path}")
+                
+                # Кнопка скачивания
+                st.download_button(
+                    label="📥 Скачать HTML отчет",
+                    data=html_content,
+                    file_name=os.path.basename(report_path),
+                    mime="text/html"
+                )
+                
+                # Предпросмотр отчета
+                with st.expander("Предпросмотр отчета"):
+                    st.components.v1.html(html_content, height=600, scrolling=True)
+                        
+        except Exception as e:
+            st.error(f"Ошибка при генерации отчета: {e}")
+            import traceback
+            st.code(traceback.format_exc())
 
 
 def main():
