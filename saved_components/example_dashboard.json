@@ -1,0 +1,25 @@
+[
+  {
+    "component_type": "TEXT",
+    "text": "# Sample Dashboard\nThis dashboard demonstrates the component saving/loading system.",
+    "type": "text"
+  },
+  {
+    "component_type": "CHART",
+    "type": "chart",
+    "chart_class": "Figure",
+    "chart_config": {}
+  },
+  {
+    "component_type": "CHART",
+    "type": "chart",
+    "chart_class": "Figure",
+    "chart_config": {}
+  },
+  {
+    "component_type": "CHART",
+    "type": "chart",
+    "chart_class": "Figure",
+    "chart_config": {}
+  }
+]
