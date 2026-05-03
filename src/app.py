@@ -26,6 +26,7 @@ from statistics import CorrelationAnalysis, TTestAnalysis, ChiSquaredTest, ANOVA
 from preprocessing import DataPreprocessor
 from report_generator import ReportGenerator
 from datetime import datetime
+from gigachat_assistant import GigaChatAssistant, get_dataframe_info
 
 # Настройка страницы
 st.set_page_config(layout="wide", page_title="Система исследования данных", page_icon="🚽")
@@ -2261,10 +2262,349 @@ def generate_report():
             import traceback
             st.code(traceback.format_exc())
 
+def display_ai_tab():
+    """Отображение вкладки AI-ассистента"""
+    st.header("🤖 AI-ассистент (GigaChat)")
+    
+    # Инициализация ассистента
+    if "gigachat_assistant" not in st.session_state:
+        st.session_state.gigachat_assistant = None
+    
+    # Проверка наличия ключа
+    has_key = False
+    api_key = None
+    try:
+        api_key = st.secrets.get("gigachat", {}).get("api_key")
+        has_key = bool(api_key)
+    except:
+        pass
+    
+    # Если ассистент не инициализирован
+    if not st.session_state.gigachat_assistant or not st.session_state.gigachat_assistant.client:
+        st.info("""
+        ### 🔑 Необходим API ключ GigaChat
+        
+        **Как получить ключ:**
+        1. Перейдите на [developers.sber.ru](https://developers.sber.ru/)
+        2. Зарегистрируйтесь или войдите
+        3. Создайте проект и получите API ключ
+        
+        **Способы подключения:**
+        - Введите ключ ниже
+        - Добавьте в файл `.streamlit/secrets.toml`:
+        ```toml
+        [gigachat]
+        api_key = "ваш_ключ"
+        ```
+        """)
+        
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            api_key = st.text_input(
+                "API ключ GigaChat",
+                type="password",
+                value=api_key if has_key else "",
+                placeholder="Введите ваш API ключ..."
+            )
+        with col2:
+            st.write("")
+            st.write("")
+            if st.button("🔌 Подключить", use_container_width=True, type="primary") and api_key:
+                with st.spinner("Подключаюсь..."):
+                    st.session_state.gigachat_assistant = GigaChatAssistant(api_key=api_key)
+                    if st.session_state.gigachat_assistant.client:
+                        st.success("✅ Успешно подключено!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Не удалось подключиться. Проверьте ключ.")
+        
+        # Если ключ был в secrets, пробуем подключиться автоматически
+        if has_key and not st.session_state.gigachat_assistant:
+            if st.button("🔄 Подключиться автоматически", use_container_width=True):
+                with st.spinner("Подключаюсь..."):
+                    st.session_state.gigachat_assistant = GigaChatAssistant(api_key=api_key)
+                    if st.session_state.gigachat_assistant.client:
+                        st.success("✅ Успешно подключено!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Не удалось подключиться")
+        
+        return
+    
+    # Ассистент подключен
+    assistant = st.session_state.gigachat_assistant
+    st.success("✅ AI-ассистент активен")
+    
+    # Выбор режима работы
+    mode = st.radio(
+        "Режим работы",
+        options=["chat", "analysis", "charts", "explain"],
+        format_func=lambda x: {
+            "chat": "💬 Чат",
+            "analysis": "🔍 Анализ данных",
+            "charts": "📊 Подбор графиков",
+            "explain": "📝 Объяснение операций"
+        }.get(x, x),
+        horizontal=True
+    )
+    
+    st.divider()
+    
+    # Получение списка датафреймов
+    df_names = st.session_state.app_state.get_dataframe_names()
+    
+    # РЕЖИМ: Чат с ассистентом
+    if mode == "chat":
+        st.subheader("💬 Чат с AI-ассистентом")
+        
+        # Инициализация истории
+        if "ai_chat_history" not in st.session_state:
+            st.session_state.ai_chat_history = []
+        
+        # Отображение истории сообщений
+        chat_container = st.container()
+        with chat_container:
+            for msg in st.session_state.ai_chat_history:
+                if msg["role"] == "user":
+                    with st.chat_message("user"):
+                        st.write(msg["content"])
+                else:
+                    with st.chat_message("assistant"):
+                        st.markdown(msg["content"])
+        
+        # Поле ввода
+        if prompt := st.chat_input("Задайте вопрос о данных, анализе, визуализации..."):
+            # Добавляем сообщение пользователя
+            st.session_state.ai_chat_history.append({"role": "user", "content": prompt})
+            
+            # Собираем контекст из текущих данных
+            df_info = {}
+            if df_names:
+                current_df = st.session_state.app_state.get_dataframe_by_id(
+                    st.session_state.app_state.current_df_id
+                )
+                if current_df is not None:
+                    df_info = get_dataframe_info(current_df)
+            
+            # Получаем ответ от ассистента
+            with st.spinner("🤔 Думаю..."):
+                response = assistant.generate_data_analysis(df_info, prompt)
+            
+            # Добавляем ответ
+            st.session_state.ai_chat_history.append({"role": "assistant", "content": response})
+            st.rerun()
+        
+        # Кнопка очистки истории
+        if st.session_state.ai_chat_history:
+            col1, col2 = st.columns([1, 5])
+            with col1:
+                if st.button("🗑 Очистить чат"):
+                    st.session_state.ai_chat_history = []
+                    st.rerun()
+    
+    # РЕЖИМ: Автоматический анализ
+    elif mode == "analysis":
+        st.subheader("🔍 Автоматический анализ данных")
+        st.write("AI проанализирует данные и предложит рекомендации")
+        
+        if not df_names:
+            st.warning("Нет доступных данных. Загрузите CSV файл.")
+            return
+        
+        # Выбор датафрейма
+        selected_df_id = st.selectbox(
+            "Выберите датафрейм для анализа",
+            options=list(df_names.keys()),
+            format_func=lambda x: df_names[x],
+            key="ai_analysis_df"
+        )
+        
+        df = st.session_state.app_state.get_dataframe_by_id(selected_df_id)
+        
+        if df is not None:
+            # Показываем краткую информацию
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Строк", df.shape[0])
+            with col2:
+                st.metric("Колонок", df.shape[1])
+            with col3:
+                missing = df.isna().sum().sum()
+                st.metric("Пропусков", missing)
+            
+            # Кнопка анализа
+            if st.button("🔍 Анализировать данные", use_container_width=True, type="primary"):
+                with st.spinner("🔍 Анализирую данные... Это может занять некоторое время"):
+                    analysis = assistant.analyze_dataframe(df)
+                
+                if analysis:
+                    st.markdown("### 📊 Результаты анализа")
+                    st.markdown(analysis)
+                    
+                    # Добавление в компоненты
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("📌 Сохранить анализ как компонент", use_container_width=True):
+                            from components import TextComponent
+                            text_component = TextComponent(text=f"### 🤖 AI-анализ данных\n\n{analysis}")
+                            text_component.name = f"🤖 AI-анализ: {df_names[selected_df_id]}"
+                            st.session_state.app_state.add_component(text_component)
+                            st.success("✅ Анализ добавлен в компоненты!")
+                    with col2:
+                        # Скачивание анализа
+                        st.download_button(
+                            label="📥 Скачать анализ",
+                            data=f"# AI-анализ данных\n\n{analysis}",
+                            file_name="ai_analysis.md",
+                            mime="text/markdown",
+                            use_container_width=True
+                        )
+    
+    # РЕЖИМ: Подбор графиков
+    elif mode == "charts":
+        st.subheader("📊 Рекомендации по визуализации")
+        st.write("AI предложит подходящие типы графиков")
+        
+        if not df_names:
+            st.warning("Нет доступных данных. Загрузите CSV файл.")
+            return
+        
+        # Выбор датафрейма
+        selected_df_id = st.selectbox(
+            "Выберите датафрейм",
+            options=list(df_names.keys()),
+            format_func=lambda x: df_names[x],
+            key="ai_charts_df"
+        )
+        
+        df = st.session_state.app_state.get_dataframe_by_id(selected_df_id)
+        
+        if df is not None:
+            # Выбор колонок
+            st.write("Выберите интересующие колонки (опционально):")
+            columns = st.multiselect(
+                "Колонки для визуализации",
+                options=df.columns.tolist(),
+                help="Оставьте пустым для рекомендаций по всем данным"
+            )
+            
+            # Кнопка получения рекомендаций
+            if st.button("📊 Получить рекомендации", use_container_width=True, type="primary"):
+                with st.spinner("🎨 Подбираю визуализации..."):
+                    suggestions = assistant.suggest_charts(df, columns if columns else None)
+                
+                if suggestions:
+                    st.markdown("### 📊 Рекомендованные графики")
+                    st.markdown(suggestions)
+                    
+                    # Быстрые действия
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("📌 Добавить в компоненты", use_container_width=True):
+                            from components import TextComponent
+                            text_component = TextComponent(text=f"### 📊 Рекомендации по графикам\n\n{suggestions}")
+                            text_component.name = f"📊 Рекомендации: {df_names[selected_df_id]}"
+                            st.session_state.app_state.add_component(text_component)
+                            st.success("✅ Рекомендации добавлены!")
+    
+    # РЕЖИМ: Объяснение операций
+    elif mode == "explain":
+        st.subheader("📝 Объяснение операций с данными")
+        st.write("AI объяснит, что делает выбранная операция")
+        
+        if not st.session_state.app_state.operations:
+            st.warning("Нет выполненных операций. Выполните операции с данными.")
+            return
+        
+        # Список операций
+        operation_options = {
+            op.id: op for op in st.session_state.app_state.operations
+        }
+        
+        selected_op_id = st.selectbox(
+            "Выберите операцию для объяснения",
+            options=list(operation_options.keys()),
+            format_func=lambda x: f"{operation_options[x].operation_type}: {operation_options[x].name}"
+        )
+        
+        if selected_op_id:
+            operation = operation_options[selected_op_id]
+            
+            # Показываем информацию об операции
+            with st.expander("📋 Информация об операции"):
+                st.write(f"Тип: {operation.operation_type}")
+                st.write(f"Название: {operation.name}")
+                
+                if hasattr(operation, 'column'):
+                    st.write(f"Колонка: {operation.column}")
+                    st.write(f"Тип фильтра: {getattr(operation, 'filter_type', 'N/A')}")
+                if hasattr(operation, 'group_by'):
+                    st.write(f"Группировка: {', '.join(operation.group_by)}")
+                    st.write(f"Агрегации: {getattr(operation, 'agg_func', {})}")
+                if hasattr(operation, 'clean_type'):
+                    st.write(f"Тип очистки: {operation.clean_type}")
+                if hasattr(operation, 'columns') and operation.columns:
+                    st.write(f"Колонки: {', '.join(operation.columns)}")
+            
+            # Кнопка объяснения
+            if st.button("📝 Объяснить операцию", use_container_width=True, type="primary"):
+                # Получаем датафрейм
+                source_df_id = getattr(operation, 'source_df_id', None)
+                df = st.session_state.app_state.get_dataframe_by_id(source_df_id) if source_df_id else None
+                
+                if df is not None:
+                    df_info = get_dataframe_info(df)
+                    
+                    with st.spinner("📝 Объясняю операцию..."):
+                        # Собираем параметры
+                        params = {}
+                        if hasattr(operation, 'column'):
+                            params['column'] = operation.column
+                            params['filter_type'] = getattr(operation, 'filter_type', '')
+                            params['filter_value'] = getattr(operation, 'filter_value', '')
+                        if hasattr(operation, 'group_by'):
+                            params['group_by'] = operation.group_by
+                            params['agg_func'] = getattr(operation, 'agg_func', {})
+                        if hasattr(operation, 'clean_type'):
+                            params['clean_type'] = operation.clean_type
+                        if hasattr(operation, 'fill_value'):
+                            params['fill_value'] = operation.fill_value
+                        if hasattr(operation, 'replace_values'):
+                            params['replace_values'] = operation.replace_values
+                        
+                        explanation = assistant.explain_operation(
+                            df_info,
+                            operation.operation_type,
+                            params
+                        )
+                    
+                    if explanation:
+                        st.markdown("### 📝 Объяснение")
+                        st.markdown(explanation)
+                        
+                        if st.button("📌 Добавить объяснение в компоненты"):
+                            from components import TextComponent
+                            text_component = TextComponent(
+                                text=f"### 📝 Объяснение операции: {operation.name}\n\n{explanation}"
+                            )
+                            text_component.name = f"📝 Объяснение: {operation.name}"
+                            st.session_state.app_state.add_component(text_component)
+                            st.success("✅ Объяснение добавлено!")
+                else:
+                    st.warning("Не удалось получить исходный датафрейм для операции")
+    
+    # Отключение ассистента
+    st.divider()
+    with st.expander("⚙️ Настройки"):
+        if st.button("🔌 Отключить ассистента"):
+            st.session_state.gigachat_assistant = None
+            if "ai_chat_history" in st.session_state:
+                del st.session_state.ai_chat_history
+            st.rerun()
 
 def main():
     # Основной макет приложения
-    st.title("Cистема исследования данных")
+    st.title("Система исследования данных")
 
     # Боковая панель для операций
     with st.sidebar:
@@ -2319,8 +2659,7 @@ def main():
             if st.button("📊", help="Добавить информацию о данных", key="add_data_info_btn"):
                 add_data_info()
 
-
-                # Раздел статистического анализа
+        # Раздел статистического анализа
         st.subheader("Статистический анализ")
         
         c1, c2, c3 = st.columns(3)
@@ -2353,9 +2692,15 @@ def main():
         with c4:
             if st.button("📄", help="Сгенерировать отчет", key="report_btn"):
                 generate_report()
-        
+    
     # Основное содержимое
-    tab1, tab2, tab3, tab4 = st.tabs(["Анализ", "Операции с данными", "Предпросмотр данных", "Управление состоянием"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "Анализ", 
+        "Операции с данными", 
+        "Предпросмотр данных", 
+        "Управление состоянием",
+        "🤖 AI-ассистент"
+    ])
 
     with tab1:
         display_eda_tab()
@@ -2368,6 +2713,9 @@ def main():
 
     with tab4:
         display_state_management_tab()
+    
+    with tab5:
+        display_ai_tab()
 
 
 if __name__ == "__main__":
