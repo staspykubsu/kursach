@@ -27,6 +27,7 @@ from preprocessing import DataPreprocessor
 from report_generator import ReportGenerator
 from datetime import datetime
 from gigachat_assistant import GigaChatAssistant, get_dataframe_info
+from analysis_templates import TEMPLATES, apply_template, check_template_requirements, get_numeric_columns
 
 # Настройка страницы
 st.set_page_config(layout="wide", page_title="Система исследования данных", page_icon="🚽")
@@ -1473,10 +1474,8 @@ def display_sample_data(df):
     st.subheader("Пример данных")
     st.dataframe(df.head())
 
-
 def display_eda_tab():
     """Отображение компонентов EDA в первой вкладке"""
-    # Отображение компонентов
     st.header("Компоненты анализа")
     if st.session_state.app_state.components:
         for i, component in enumerate(st.session_state.app_state.components):
@@ -1494,7 +1493,12 @@ def display_eda_tab():
                 if hasattr(component, "text"):
                     st.markdown(component.text)
                 elif hasattr(component, "chart"):
-                    st.plotly_chart(component.chart, use_container_width=True)
+                    # ДОБАВЛЕН УНИКАЛЬНЫЙ KEY
+                    st.plotly_chart(
+                        component.chart, 
+                        use_container_width=True,
+                        key=f"plotly_chart_{component_id}_{i}_{uuid4().hex[:8]}"
+                    )
                 elif hasattr(component, "info_type"):
                     display_data_info(component.info_type, component.source_df_id)
 
@@ -2602,6 +2606,85 @@ def display_ai_tab():
                 del st.session_state.ai_chat_history
             st.rerun()
 
+def display_templates_tab():
+    """Отображение вкладки шаблонов анализа"""
+    st.header("📋 Шаблоны анализа")
+    st.write("Готовые сценарии для быстрого анализа данных")
+    
+    # Получаем список датафреймов
+    df_names = st.session_state.app_state.get_dataframe_names()
+    
+    if not df_names:
+        st.warning("Нет доступных данных. Загрузите CSV файл.")
+        return
+    
+    # Выбор датафрейма
+    selected_df_id = st.selectbox(
+        "Выберите датафрейм",
+        options=list(df_names.keys()),
+        format_func=lambda x: df_names[x]
+    )
+    
+    df = st.session_state.app_state.get_dataframe_by_id(selected_df_id)
+    
+    if df is None:
+        st.warning("Датафрейм не найден")
+        return
+    
+    # Краткая информация
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Строк", df.shape[0])
+    with col2:
+        st.metric("Колонок", df.shape[1])
+    with col3:
+        num_cols = len(get_numeric_columns(df))
+        st.metric("Числовых", num_cols)
+    
+    st.divider()
+    
+    # Список шаблонов
+    st.subheader("Доступные шаблоны")
+    
+    for template_key, template in TEMPLATES.items():
+        can_run, warnings = check_template_requirements(df, template_key)
+        
+        with st.container():
+            col1, col2, col3 = st.columns([1, 3, 2])
+            
+            with col1:
+                st.markdown(f"## {template['icon']}")
+            
+            with col2:
+                st.markdown(f"### {template['name']}")
+                st.write(template['description'])
+                
+                if can_run:
+                    st.success("✅ Подходит")
+                else:
+                    for w in warnings:
+                        st.warning(f"⚠️ {w}")
+            
+            with col3:
+                st.write("")
+                if st.button("Применить", key=f"tpl_{template_key}", 
+                           disabled=not can_run, use_container_width=True):
+                    
+                    with st.spinner("Применяю шаблон..."):
+                        components, errors = apply_template(template_key, df, st.session_state.app_state)
+                    
+                    if components:
+                        for comp in components:
+                            st.session_state.app_state.add_component(comp)
+                        st.success(f"Добавлено {len(components)} компонентов")
+                        st.rerun()
+                    else:
+                        for err in errors:
+                            st.error(err)
+            
+            st.divider()
+
+
 def main():
     # Основной макет приложения
     st.title("Система исследования данных")
@@ -2694,10 +2777,12 @@ def main():
                 generate_report()
     
     # Основное содержимое
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    # Основное содержимое
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "Анализ", 
         "Операции с данными", 
-        "Предпросмотр данных", 
+        "Предпросмотр данных",
+        "📋 Шаблоны", 
         "Управление состоянием",
         "🤖 AI-ассистент"
     ])
@@ -2710,11 +2795,14 @@ def main():
 
     with tab3:
         display_data_tab()
-
+    
     with tab4:
+        display_templates_tab()
+
+    with tab5:
         display_state_management_tab()
     
-    with tab5:
+    with tab6:
         display_ai_tab()
 
 
